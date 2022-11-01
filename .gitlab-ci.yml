@@ -1,0 +1,50 @@
+default:
+  image: registry.gitlab.com/gitlab-org/terraform-images/stable:latest
+
+variables:
+  TF_ROOT: ${CI_PROJECT_DIR}
+  TF_ADDRESS: ${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/terraform/state/${CI_PROJECT_NAME}
+
+before_script:
+  - cd ${TF_ROOT}
+
+stages:
+  - prepare
+  - validate
+  - plan
+  - apply
+  - destroy
+
+init:
+  stage: prepare
+  script:
+    - gitlab-terraform init -upgrade -backend-config=access_key=${AWS_ACCESS_KEY_ID} -backend-config=secret_key=${AWS_SECRET_ACCESS_KEY}
+
+validate:
+  stage: validate
+  script:
+    - gitlab-terraform validate
+
+plan:
+  stage: plan
+  script:
+    - gitlab-terraform plan
+    - gitlab-terraform plan-json
+  artifacts:
+    name: plan
+    paths:
+      - ${TF_ROOT}/plan.cache
+    reports:
+      terraform: ${TF_ROOT}/plan.json
+
+apply:
+  stage: apply
+  script:
+    - gitlab-terraform apply 
+  dependencies:
+    - plan
+
+destroy: 
+  stage: destroy
+  script:
+    - gitlab-terraform destroy --auto-approve
